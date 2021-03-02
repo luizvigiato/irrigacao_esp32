@@ -1,5 +1,6 @@
 #include <WiFiManager.h>
 #include <ESP8266WiFi.h>
+#include <EEPROM.h>
 
 
 WiFiManager wifiManager;
@@ -9,13 +10,25 @@ WiFiClient client;
 
 String header;
 
+#define temp 19
+#define humi 5
+#define led_modulo 2
+
+
 int temperatura;
-int humidade;
-int contagem;
+int humidade = 600;
+int contagem = 0;
+int media = 0;
+int registro;
 
 void setup() {
   wifiManager.autoConnect("Irrigacao LH v.2");
   Serial.begin(115200);
+  EEPROM.begin(256);
+  pinMode(temp, INPUT);
+  pinMode(humi, INPUT);
+  pinMode(led_modulo, OUTPUT);
+  
 
   delay(5000);
   // Boot service irrigation
@@ -35,12 +48,19 @@ void loop() {
 //  Serial.println(wifiManager.autoConnect());
 
   client = server.available();
-  
+  if(contagem > 60){
+    humidade = media / 60;
+    contagem = 0;
+  } else {
+    media += analogRead(humi);
+
+  }
+    
 
   if(client){
     Serial.println("Cliente acessando");
 
-    String request = client.readStringUntil('r');
+    String request = client.readStringUntil('\r');
 
     
     while(client.available()){
@@ -49,15 +69,12 @@ void loop() {
     }
 
     client.flush();
-
-//    Serial.println(textoHtmlPagina());
     Serial.println("Impressao pagina");
     client.println(textoHtmlPagina());
-//    client.stop();
-//    Serial.println(request);
-//    Serial.println(header);
   }
   
+  contagem++;
+  delay(1000);
 
 }
 
@@ -71,7 +88,14 @@ String textoHtmlPagina(){
                "\r\n");            
   htmlPage += F("<!DOCTYPE HTML>"
                 "<html lang=\"pt-BR\"><head>"
-                "<title>Sistema de Irrigacao</title></head><body>"
-                "<h1><center>Sistema de Irrigacao Vigiato v.2<h1>");
+                "<title>Sistema de Irrigacao</title><meta charset=\"utf-8\"></head><body>"
+                "<center><h1>Sistema de Irrigacao Vigiato v.2</h1>"
+                "<h2>Temperatura atual: ");
+  String color = "red";
+
+  htmlPage += (String) contagem;
+  htmlPage +=   " c </h2><h3>Status de Irrigação: <em style=\"color:";
+  htmlPage += color;
+  htmlPage +=   "\">OFFLINE</em></h3>";
   return htmlPage;  
 }
